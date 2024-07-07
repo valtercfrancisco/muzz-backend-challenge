@@ -3,16 +3,15 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
-
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
+	"log"
+	"os"
 )
 
-// ConnectDB connects to the PostgreSQL database using configuration from environment variables.
 func ConnectDB() (*sql.DB, error) {
 	dbHost := viper.GetString("POSTGRES_HOST")
 	dbPort := viper.GetString("POSTGRES_PORT")
@@ -40,7 +39,6 @@ func ConnectDB() (*sql.DB, error) {
 	return db, nil
 }
 
-// RunMigrations runs the database migrations.
 func RunMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -59,5 +57,20 @@ func RunMigrations(db *sql.DB) error {
 	}
 
 	log.Println("Database migrations applied successfully!")
+	return nil
+}
+
+func LoadMockData(db *sql.DB) error {
+	content, err := os.ReadFile("/app/internal/db/mock/insert_mock_data.sql")
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(string(content))
+	if err != nil {
+		return err
+	}
+
+	log.Println("Mock data loaded successfully!")
 	return nil
 }

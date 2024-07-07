@@ -1,8 +1,10 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE IF NOT EXISTS likes (
     id SERIAL PRIMARY KEY,
-    actor_user_id INT NOT NULL,
-    recipient_user_id INT NOT NULL,
-    liked_recipient BOOLEAN NOT NULL
+    actor_user_id UUID NOT NULL,
+    recipient_user_id UUID NOT NULL,
+    liked_recipient BOOLEAN NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(actor_user_id, recipient_user_id),
     FOREIGN KEY (actor_user_id) REFERENCES users(user_id),

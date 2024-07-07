@@ -5,6 +5,7 @@ import (
 	"muzz-backend-challenge/internal/config"
 	"muzz-backend-challenge/internal/db"
 	explore "muzz-backend-challenge/pkg/proto"
+	"muzz-backend-challenge/pkg/repository"
 	"net"
 
 	"muzz-backend-challenge/pkg/service"
@@ -25,13 +26,18 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	if err := db.LoadMockData(dbConn); err != nil {
+		log.Fatalf("Failed to load mock data: %v", err)
+	}
+
 	lis, err := net.Listen("tcp", ":8089")
 	if err != nil {
 		log.Fatal("cannot create listener: %s", err)
 	}
 
 	serviceRegistrar := grpc.NewServer()
-	exploreService := service.NewExploreService()
+	exploreRepository := repository.NewExploreRepository(dbConn)
+	exploreService := service.NewExploreService(exploreRepository)
 
 	explore.RegisterExploreServiceServer(serviceRegistrar, exploreService)
 	err = serviceRegistrar.Serve(lis)

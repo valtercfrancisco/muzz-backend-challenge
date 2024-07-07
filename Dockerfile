@@ -28,6 +28,7 @@ WORKDIR /root/
 # Copy the compiled binary from the previous stage into the final image
 COPY --from=builder /app/muzz-backend-challenge .
 COPY --from=builder /app/internal/db/migrations /db/migrations
+COPY --from=builder /app/internal/db/mock /app/internal/db/mock
 COPY db-variables.env .
 
 # Ensure the binary is executable

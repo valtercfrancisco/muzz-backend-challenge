@@ -10,7 +10,8 @@ services:
     env_file:
       - ./db-variables.env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - type: tmpfs
+        target: /var/lib/postgresql/data
 
   app:
     build:
@@ -24,6 +25,8 @@ services:
       - ./db-variables.env
     depends_on:
       - postgres
+    volumes:
+      - ./internal/db/mock:/app/internal/db/mock:ro
 
 volumes:
   postgres_data:

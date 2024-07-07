@@ -7,13 +7,11 @@ import (
 )
 
 func InitConfig() {
-	// Load environment variables from .env file
 	if err := godotenv.Load("./db-variables.env"); err != nil {
 		log.Fatalf("Error loading db-variables.env file: %v", err)
 	}
 
-	// Optionally, set Viper configuration settings
-	viper.AutomaticEnv() // read in environment variables
+	viper.AutomaticEnv()
 
 	// Explicitly bind environment variables
 	viper.BindEnv("POSTGRES_HOST")
