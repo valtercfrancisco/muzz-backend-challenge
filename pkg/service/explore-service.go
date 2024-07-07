@@ -1,16 +1,16 @@
-package main
+package service
 
 import (
 	"context"
-	"log"
-	"muzz-backend-challenge/explore"
-	"net"
-
-	"google.golang.org/grpc"
+	explore "muzz-backend-challenge/pkg/proto"
 )
 
 type ExploreServiceImplementation struct {
 	explore.UnimplementedExploreServiceServer
+}
+
+func NewExploreService() explore.ExploreServiceServer {
+	return &ExploreServiceImplementation{}
 }
 
 func (s ExploreServiceImplementation) ListLikedYou(
@@ -42,20 +42,4 @@ func (s ExploreServiceImplementation) PutDecision(
 	*explore.PutDecisionRequest,
 ) (*explore.PutDecisionResponse, error) {
 	return &explore.PutDecisionResponse{}, nil
-}
-
-func main() {
-	lis, err := net.Listen("tcp", ":8089")
-	if err != nil {
-		log.Fatal("cannot create lister: %s", err)
-	}
-
-	serviceRegistrar := grpc.NewServer()
-	service := &ExploreServiceImplementation{}
-
-	explore.RegisterExploreServiceServer(serviceRegistrar, service)
-	err = serviceRegistrar.Serve(lis)
-	if err != nil {
-		log.Fatalf("Impossible to serve: %s", err)
-	}
 }

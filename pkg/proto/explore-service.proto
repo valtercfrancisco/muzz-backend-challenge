@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package explore;
 
-option go_package = "muzz-backend-challenge/explore;explore";
+option go_package = "muzz-backend-challenge/pkg/proto;explore";
 
 service ExploreService {
   rpc ListLikedYou(ListLikedYouRequest) returns (ListLikedYouResponse);
