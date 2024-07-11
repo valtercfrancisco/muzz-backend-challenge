@@ -4,54 +4,54 @@ DELETE FROM likes;
 DELETE FROM decisions;
 DELETE FROM users;
 
--- Insert mock data into users table with UUIDs
+-- Insert mock data into users table with fixed UUIDs
 INSERT INTO users (user_id, username)
 VALUES
-    (uuid_generate_v4(), 'Alice'),
-    (uuid_generate_v4(), 'Bob'),
-    (uuid_generate_v4(), 'Charlie'),
-    (uuid_generate_v4(), 'David'),
-    (uuid_generate_v4(), 'Eva'),
-    (uuid_generate_v4(), 'Frank'),
-    (uuid_generate_v4(), 'Grace'),
-    (uuid_generate_v4(), 'Hannah'),
-    (uuid_generate_v4(), 'Ivy'),
-    (uuid_generate_v4(), 'Jack'),
-    (uuid_generate_v4(), 'Katherine'),
-    (uuid_generate_v4(), 'Liam'),
-    (uuid_generate_v4(), 'Mia'),
-    (uuid_generate_v4(), 'Noah'),
-    (uuid_generate_v4(), 'Olivia'),
-    (uuid_generate_v4(), 'Paul'),
-    (uuid_generate_v4(), 'Quincy'),
-    (uuid_generate_v4(), 'Rachel'),
-    (uuid_generate_v4(), 'Sam'),
-    (uuid_generate_v4(), 'Tina');
+    ('00000000-0000-0000-0000-000000000001', 'Alice'),
+    ('00000000-0000-0000-0000-000000000002', 'Bob'),
+    ('00000000-0000-0000-0000-000000000003', 'Charlie'),
+    ('00000000-0000-0000-0000-000000000004', 'David'),
+    ('00000000-0000-0000-0000-000000000005', 'Eva'),
+    ('00000000-0000-0000-0000-000000000006', 'Frank'),
+    ('00000000-0000-0000-0000-000000000007', 'Grace'),
+    ('00000000-0000-0000-0000-000000000008', 'Hannah'),
+    ('00000000-0000-0000-0000-000000000009', 'Ivy'),
+    ('00000000-0000-0000-0000-000000000010', 'Jack'),
+    ('00000000-0000-0000-0000-000000000011', 'Katherine'),
+    ('00000000-0000-0000-0000-000000000012', 'Liam'),
+    ('00000000-0000-0000-0000-000000000013', 'Mia'),
+    ('00000000-0000-0000-0000-000000000014', 'Noah'),
+    ('00000000-0000-0000-0000-000000000015', 'Olivia'),
+    ('00000000-0000-0000-0000-000000000016', 'Paul'),
+    ('00000000-0000-0000-0000-000000000017', 'Quincy'),
+    ('00000000-0000-0000-0000-000000000018', 'Rachel'),
+    ('00000000-0000-0000-0000-000000000019', 'Sam'),
+    ('00000000-0000-0000-0000-000000000020', 'Tina');
 
--- Insert mock data into likes table with UUIDs, randomly skipping some users and allowing multiple likes per user
-WITH user_uuids AS (
-    SELECT user_id, username FROM users
-)
+-- Insert mock data into likes table with fixed relationships, including mutual likes
 INSERT INTO likes (actor_user_id, recipient_user_id)
-SELECT
-    u1.user_id AS actor_user_id,
-    u2.user_id AS recipient_user_id
-FROM
-    user_uuids u1
-        CROSS JOIN user_uuids u2
-WHERE
-    u1.user_id != u2.user_id -- Ensure actor and recipient are different
-  AND random() > 0.2 -- Randomly skip some users
-  AND (
-          SELECT COUNT(*) FROM likes
-          WHERE actor_user_id = u1.user_id
-      ) < (random() * 10) + 1 -- Randomly determine the number of likes per user, between 1 and 10
-  AND NOT EXISTS (
-    SELECT 1 FROM likes
-    WHERE actor_user_id = u1.user_id
-      AND recipient_user_id = u2.user_id
-)
-LIMIT 100; -- Limit the number of inserts for testing
+VALUES
+    ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'), -- Alice likes Bob
+    ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001'), -- Bob likes Alice (mutual)
+    ('00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004'), -- Charlie likes David
+    ('00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000003'), -- David likes Charlie (mutual)
+    ('00000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000006'), -- Eva likes Frank
+    ('00000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000008'), -- Grace likes Hannah
+    ('00000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000007'), -- Hannah likes Grace (mutual)
+    ('00000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000010'), -- Ivy likes Jack
+    ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000012'), -- Katherine likes Liam
+    ('00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000011'), -- Liam likes Katherine (mutual)
+    ('00000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000014'), -- Mia likes Noah
+    ('00000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000016'), -- Olivia likes Paul
+    ('00000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000018'), -- Quincy likes Rachel
+    ('00000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000017'), -- Rachel likes Quincy (mutual)
+    ('00000000-0000-0000-0000-000000000019', '00000000-0000-0000-0000-000000000020'), -- Sam likes Tina
+    ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'), -- Bob likes Charlie
+    ('00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001'), -- David likes Alice
+    ('00000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000009'), -- Frank likes Ivy
+    ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000005'), -- Jack likes Eva
+    ('00000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000011'), -- Mia likes Katherine
+    ('00000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000015'); -- Noah likes Olivia
 
 -- Insert mock data into decisions table based on likes table
 INSERT INTO decisions (actor_user_id, recipient_user_id, liked_recipient)
@@ -81,5 +81,5 @@ WHERE
     WHERE actor_user_id = u1.user_id
       AND recipient_user_id = u2.user_id
 )
-  AND random() > 0.7 -- Randomly include some users with liked = FALSE
+  AND random() > 0.7 -- Randomly users to simulate those who haven't seen the liker yet
 LIMIT 100; -- Limit the number of inserts for testing
