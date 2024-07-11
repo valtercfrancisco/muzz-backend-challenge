@@ -9,6 +9,12 @@ import (
 
 type ExploreRepository interface {
 	GetLikedYou(ctx context.Context, recipientUserID string, limit, offset int) ([]*explore.ListLikedYouResponse_Liker, error)
+	GetNewLikedYou(ctx context.Context, recipientUserID string, limit, offset int) ([]*explore.ListLikedYouResponse_Liker, error)
+	CountLikes(recipientUserID string) (int64, error)
+	InsertDecision(actorUserID, recipientUserID string, likedRecipient bool) error
+	InsertLike(actorUserID, recipientUserID string) error
+	DeleteLike(actorUserID, recipientUserID string) error
+	CheckMutualLike(actorUserID, recipientUserID string) (bool, error)
 }
 
 type exploreRepository struct {
@@ -23,7 +29,7 @@ func (r *exploreRepository) GetLikedYou(ctx context.Context, recipientUserID str
 	query := `
         SELECT actor_user_id, EXTRACT(EPOCH FROM created_at) AS unix_timestamp
         FROM likes
-        WHERE recipient_user_id = $1 AND liked_recipient = TRUE
+        WHERE recipient_user_id = $1
         ORDER BY created_at DESC
         LIMIT $2 OFFSET $3`
 
@@ -50,4 +56,93 @@ func (r *exploreRepository) GetLikedYou(ctx context.Context, recipientUserID str
 	}
 
 	return likers, nil
+}
+
+func (r *exploreRepository) GetNewLikedYou(ctx context.Context, recipientUserID string, limit, offset int) ([]*explore.ListLikedYouResponse_Liker, error) {
+	query := `
+        SELECT actor_user_id, EXTRACT(EPOCH FROM created_at) AS unix_timestamp
+        FROM likes
+        WHERE recipient_user_id = $1 
+          AND actor_user_id NOT IN (
+              SELECT recipient_user_id 
+              FROM likes 
+              WHERE actor_user_id = $1
+          )
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3`
+
+	rows, err := r.db.QueryContext(ctx, query, recipientUserID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	var likers []*explore.ListLikedYouResponse_Liker
+	for rows.Next() {
+		var liker explore.ListLikedYouResponse_Liker
+		var unixTimestamp float64
+		if err := rows.Scan(&liker.ActorId, &unixTimestamp); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		liker.UnixTimestamp = uint64(unixTimestamp)
+
+		likers = append(likers, &liker)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return likers, nil
+}
+
+func (r *exploreRepository) CountLikes(recipientUserID string) (int64, error) {
+	var count int64
+	query := "SELECT COUNT(*) FROM likes WHERE recipient_user_id = $1"
+	err := r.db.QueryRow(query, recipientUserID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *exploreRepository) InsertDecision(actorUserID, recipientUserID string, likedRecipient bool) error {
+	query := `
+        INSERT INTO decisions (actor_user_id, recipient_user_id, liked_recipient)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (actor_user_id, recipient_user_id)
+        DO UPDATE SET liked_recipient = EXCLUDED.liked_recipient, created_at = CURRENT_TIMESTAMP`
+	_, err := r.db.Exec(query, actorUserID, recipientUserID, likedRecipient)
+	if err != nil {
+		return fmt.Errorf("failed to insert decision: %w", err)
+	}
+	return nil
+}
+
+func (r *exploreRepository) InsertLike(actorUserID, recipientUserID string) error {
+	query := "INSERT INTO likes (actor_user_id, recipient_user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+	_, err := r.db.Exec(query, actorUserID, recipientUserID)
+	if err != nil {
+		return fmt.Errorf("failed to insert like: %w", err)
+	}
+	return nil
+}
+
+func (r *exploreRepository) DeleteLike(actorUserID, recipientUserID string) error {
+	query := "DELETE FROM likes WHERE actor_user_id = $1 AND recipient_user_id = $2"
+	_, err := r.db.Exec(query, actorUserID, recipientUserID)
+	if err != nil {
+		return fmt.Errorf("failed to delete like: %w", err)
+	}
+	return nil
+}
+
+func (r *exploreRepository) CheckMutualLike(actorUserID, recipientUserID string) (bool, error) {
+	query := "SELECT EXISTS (SELECT 1 FROM likes WHERE actor_user_id = $1 AND recipient_user_id = $2)"
+	var exists bool
+	err := r.db.QueryRow(query, recipientUserID, actorUserID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check mutual like: %w", err)
+	}
+	return exists, nil
 }
