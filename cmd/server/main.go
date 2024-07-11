@@ -32,7 +32,7 @@ func main() {
 
 	lis, err := net.Listen("tcp", ":8089")
 	if err != nil {
-		log.Fatal("cannot create listener: %s", err)
+		log.Fatalf("cannot create listener: %s", err)
 	}
 
 	serviceRegistrar := grpc.NewServer()
