@@ -1,0 +1,15 @@
+# Use an official Golang runtime as a parent image
+FROM golang:1.22.5
+
+# Set the working directory in the container
+WORKDIR /app
+
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+# Copy the current directory contents into the container at /app
+COPY . .
+
+# Run go test command when the container starts
+CMD ["go", "test", "./..."]

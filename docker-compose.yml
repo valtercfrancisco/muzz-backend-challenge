@@ -28,6 +28,19 @@ services:
     volumes:
       - ./internal/db/mock:/app/internal/db/mock:ro
 
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: muzz-backend-challenge-test
+    env_file:
+      - ./db-variables.env
+    tmpfs:
+      - /app/internal/db/mock
+    depends_on:
+      - postgres
+    command: ["go", "test", "./..."]
+
 volumes:
   postgres_data:
     driver: local
