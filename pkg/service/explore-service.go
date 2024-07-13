@@ -1,3 +1,4 @@
+// Package service implements gRPC services for handling user exploration functionalities.
 package service
 
 import (
@@ -10,15 +11,21 @@ import (
 	"strconv"
 )
 
+// ExploreService implements the ExploreServiceServer interface.
 type ExploreService struct {
 	repository repository.ExploreRepository
 	explore.UnimplementedExploreServiceServer
 }
 
+// NewExploreService creates a new instance of ExploreService.
 func NewExploreService(repo repository.ExploreRepository) *ExploreService {
 	return &ExploreService{repository: repo}
 }
 
+// ListLikedYou retrieves a list of users who liked the recipient user.
+//
+// It retrieves likers for the given recipient user ID. Pagination is supported
+// via the pagination token, which allows fetching the next set of results.
 func (service ExploreService) ListLikedYou(
 	ctx context.Context,
 	request *explore.ListLikedYouRequest,
@@ -55,6 +62,10 @@ func (service ExploreService) ListLikedYou(
 	return response, nil
 }
 
+// ListNewLikedYou retrieves a list of new users who liked the recipient user. These are users who the recipient has seen or liked yet.
+//
+// It retrieves new likers for the given recipient user ID. Pagination is supported
+// via the pagination token, which allows fetching the next set of results.
 func (service ExploreService) ListNewLikedYou(
 	ctx context.Context,
 	request *explore.ListLikedYouRequest,
@@ -90,6 +101,9 @@ func (service ExploreService) ListNewLikedYou(
 	return response, nil
 }
 
+// CountLikedYou counts the number of users who liked the recipient user.
+//
+// It returns the count of users who liked the recipient user specified in the request.
 func (service ExploreService) CountLikedYou(
 	_ context.Context,
 	request *explore.CountLikedYouRequest,
@@ -101,6 +115,10 @@ func (service ExploreService) CountLikedYou(
 	return &explore.CountLikedYouResponse{Count: uint64(count)}, nil
 }
 
+// PutDecision records a user's decision (like/dislike) regarding another user.
+//
+// It records the decision made by the actor user regarding the recipient user.
+// If the decision results in a mutual like, it returns true in MutualLikes field.
 func (service ExploreService) PutDecision(
 	_ context.Context,
 	request *explore.PutDecisionRequest,
