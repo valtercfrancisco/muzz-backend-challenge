@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"log"
 	explore "muzz-backend-challenge/pkg/proto"
 	"muzz-backend-challenge/pkg/repository"
 	"strconv"
@@ -105,10 +106,10 @@ func (service ExploreService) ListNewLikedYou(
 //
 // It returns the count of users who liked the recipient user specified in the request.
 func (service ExploreService) CountLikedYou(
-	_ context.Context,
+	ctx context.Context,
 	request *explore.CountLikedYouRequest,
 ) (*explore.CountLikedYouResponse, error) {
-	count, err := service.repository.CountLikes(request.RecipientUserId)
+	count, err := service.repository.CountLikes(ctx, request.RecipientUserId)
 	if err != nil {
 		return nil, err
 	}
@@ -119,14 +120,24 @@ func (service ExploreService) CountLikedYou(
 //
 // It records the decision made by the actor user regarding the recipient user.
 // If the decision results in a mutual like, it returns true in MutualLikes field.
-func (service ExploreService) PutDecision(
-	_ context.Context,
+func (service *ExploreService) PutDecision(
+	ctx context.Context,
 	request *explore.PutDecisionRequest,
 ) (*explore.PutDecisionResponse, error) {
-	// Insert the decision into the decision database
-	err := service.repository.InsertDecision(request.ActorUserId, request.RecipientUserId, request.LikedRecipient)
+	// Start a transaction
+	tx, err := service.repository.BeginTransaction(ctx)
 	if err != nil {
-		return nil, err
+		log.Printf("Failed to begin transaction: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+
+	defer tx.Rollback()
+
+	// Insert the decision into the decision database
+	err = service.repository.InsertDecision(ctx, tx, request.ActorUserId, request.RecipientUserId, request.LikedRecipient)
+	if err != nil {
+		log.Printf("Failed to insert decision: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to insert decision: %v", err)
 	}
 
 	mutualLikes := false
@@ -134,22 +145,31 @@ func (service ExploreService) PutDecision(
 	// If the user liked the recipient, record the like
 	if request.LikedRecipient {
 		// Insert the like into the like database
-		err = service.repository.InsertLike(request.ActorUserId, request.RecipientUserId)
+		err = service.repository.InsertLike(ctx, tx, request.ActorUserId, request.RecipientUserId)
 		if err != nil {
-			return nil, err
+			log.Printf("Failed to insert like: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to insert like: %v", err)
 		}
 
 		// Check if the recipient also liked the actor
-		mutualLikes, err = service.repository.CheckMutualLike(request.ActorUserId, request.RecipientUserId)
+		mutualLikes, err = service.repository.CheckMutualLike(ctx, tx, request.ActorUserId, request.RecipientUserId)
 		if err != nil {
-			return nil, err
+			log.Printf("Failed to check mutual like: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to check mutual like: %v", err)
 		}
 	} else {
 		// Delete the like if the actor passes on the recipient (unmatched)
-		err = service.repository.DeleteLike(request.ActorUserId, request.RecipientUserId)
+		err = service.repository.DeleteLike(ctx, tx, request.ActorUserId, request.RecipientUserId)
 		if err != nil {
-			return nil, err
+			log.Printf("Failed to delete like: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to delete like: %v", err)
 		}
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
 	}
 
 	return &explore.PutDecisionResponse{MutualLikes: mutualLikes}, nil

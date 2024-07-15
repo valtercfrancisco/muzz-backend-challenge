@@ -10,13 +10,14 @@ import (
 
 // ExploreRepository defines methods for accessing exploration-related data.
 type ExploreRepository interface {
+	BeginTransaction(ctx context.Context) (*sql.Tx, error)
 	GetLikedYou(ctx context.Context, recipientUserID string, limit, offset int) ([]*explore.ListLikedYouResponse_Liker, error)
 	GetNewLikedYou(ctx context.Context, recipientUserID string, limit, offset int) ([]*explore.ListLikedYouResponse_Liker, error)
-	CountLikes(recipientUserID string) (int64, error)
-	InsertDecision(actorUserID, recipientUserID string, likedRecipient bool) error
-	InsertLike(actorUserID, recipientUserID string) error
-	DeleteLike(actorUserID, recipientUserID string) error
-	CheckMutualLike(actorUserID, recipientUserID string) (bool, error)
+	CountLikes(ctx context.Context, recipientUserID string) (int64, error)
+	InsertDecision(ctx context.Context, transaction *sql.Tx, actorUserID, recipientUserID string, likedRecipient bool) error
+	InsertLike(ctx context.Context, transaction *sql.Tx, actorUserID, recipientUserID string) error
+	DeleteLike(ctx context.Context, transaction *sql.Tx, actorUserID, recipientUserID string) error
+	CheckMutualLike(ctx context.Context, transaction *sql.Tx, actorUserID, recipientUserID string) (bool, error)
 }
 
 // exploreRepository implements the ExploreRepository interface.
@@ -27,6 +28,14 @@ type exploreRepository struct {
 // NewExploreRepository creates a new instance of exploreRepository.
 func NewExploreRepository(db *sql.DB) ExploreRepository {
 	return &exploreRepository{db: db}
+}
+
+func (r *exploreRepository) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }
 
 // GetLikedYou retrieves a list of users who liked the recipient user.
@@ -103,10 +112,10 @@ func (r *exploreRepository) GetNewLikedYou(ctx context.Context, recipientUserID 
 }
 
 // CountLikes counts the number of users who liked the recipient user.
-func (r *exploreRepository) CountLikes(recipientUserID string) (int64, error) {
+func (r *exploreRepository) CountLikes(ctx context.Context, recipientUserID string) (int64, error) {
 	var count int64
 	query := "SELECT COUNT(*) FROM likes WHERE recipient_user_id = $1"
-	err := r.db.QueryRow(query, recipientUserID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, query, recipientUserID).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -114,13 +123,13 @@ func (r *exploreRepository) CountLikes(recipientUserID string) (int64, error) {
 }
 
 // InsertDecision records a user's decision (like/dislike) regarding another user.
-func (r *exploreRepository) InsertDecision(actorUserID, recipientUserID string, likedRecipient bool) error {
+func (r *exploreRepository) InsertDecision(ctx context.Context, tx *sql.Tx, actorUserID, recipientUserID string, likedRecipient bool) error {
 	query := `
         INSERT INTO decisions (actor_user_id, recipient_user_id, liked_recipient)
         VALUES ($1, $2, $3)
         ON CONFLICT (actor_user_id, recipient_user_id)
         DO UPDATE SET liked_recipient = EXCLUDED.liked_recipient, created_at = CURRENT_TIMESTAMP`
-	_, err := r.db.Exec(query, actorUserID, recipientUserID, likedRecipient)
+	_, err := tx.ExecContext(ctx, query, actorUserID, recipientUserID, likedRecipient)
 	if err != nil {
 		return fmt.Errorf("failed to insert decision: %w", err)
 	}
@@ -128,9 +137,9 @@ func (r *exploreRepository) InsertDecision(actorUserID, recipientUserID string, 
 }
 
 // InsertLike records a like action from the actor user to the recipient user.
-func (r *exploreRepository) InsertLike(actorUserID, recipientUserID string) error {
+func (r *exploreRepository) InsertLike(ctx context.Context, tx *sql.Tx, actorUserID, recipientUserID string) error {
 	query := "INSERT INTO likes (actor_user_id, recipient_user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
-	_, err := r.db.Exec(query, actorUserID, recipientUserID)
+	_, err := tx.ExecContext(ctx, query, actorUserID, recipientUserID)
 	if err != nil {
 		return fmt.Errorf("failed to insert like: %w", err)
 	}
@@ -138,9 +147,9 @@ func (r *exploreRepository) InsertLike(actorUserID, recipientUserID string) erro
 }
 
 // DeleteLike removes a like action from the actor user to the recipient user.
-func (r *exploreRepository) DeleteLike(actorUserID, recipientUserID string) error {
+func (r *exploreRepository) DeleteLike(ctx context.Context, tx *sql.Tx, actorUserID, recipientUserID string) error {
 	query := "DELETE FROM likes WHERE actor_user_id = $1 AND recipient_user_id = $2"
-	_, err := r.db.Exec(query, actorUserID, recipientUserID)
+	_, err := tx.ExecContext(ctx, query, actorUserID, recipientUserID)
 	if err != nil {
 		return fmt.Errorf("failed to delete like: %w", err)
 	}
@@ -148,10 +157,10 @@ func (r *exploreRepository) DeleteLike(actorUserID, recipientUserID string) erro
 }
 
 // CheckMutualLike checks if there is a mutual like between the actor user and the recipient user.
-func (r *exploreRepository) CheckMutualLike(actorUserID, recipientUserID string) (bool, error) {
+func (r *exploreRepository) CheckMutualLike(ctx context.Context, tx *sql.Tx, actorUserID, recipientUserID string) (bool, error) {
 	query := "SELECT EXISTS (SELECT 1 FROM likes WHERE actor_user_id = $1 AND recipient_user_id = $2)"
 	var exists bool
-	err := r.db.QueryRow(query, recipientUserID, actorUserID).Scan(&exists)
+	err := tx.QueryRowContext(ctx, query, recipientUserID, actorUserID).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mutual like: %w", err)
 	}
